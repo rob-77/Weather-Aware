@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+---
+description: Core architecture rules for Weather-Aware Personal Assistant
+globs: src/**/*.py
+alwaysApply: true
+---
+
+# Architecture Rules
+
+- Strict separation of concerns:
+  - `weather.py`: ONLY API fetch/parse logic. No print statements, no advice logic.
+  - `calendar_reader.py`: ONLY reads and validates calendar.json. No print statements.
+  - `advisor.py`: ONLY rule-based reasoning combining weather + calendar data into advice. No I/O, no print statements, no API calls.
+  - `cli.py`: ONLY the REPL loop, user input/output, and orchestration calls into the other modules. No business logic here.
+- Every function should have a docstring and type hints.
+- Do not mix UI (print/input) with logic modules. If a module needs to "say" something, it should return a string/object and let cli.py print it.
+- Prefer pure functions in advisor.py so they are easy to unit test without mocking I/O.
+- This project uses Windows PowerShell as the terminal. Any terminal commands suggested should use PowerShell syntax, not bash/Unix syntax.
+- Advice synthesis is rule-based (see specs/PRD.md Section 4) — do not introduce LLM API calls for advice generation without explicit confirmation.
