@@ -33,15 +33,25 @@ You can also just type naturally, e.g. "what's my day look like?"
 """
 
 
-def run() -> None:
+def run(demo: bool = False) -> None:
     """Start the REPL. Loads environment variables, prompts for a city,
     then loops accepting commands until the user quits.
+
+    Args:
+        demo: If True, skips the live OpenWeather API call and uses
+            hardcoded sample forecast data instead (see sample_data.py).
+            Intended for graders/reviewers who don't have their own
+            OpenWeather API key. The real calendar.json is still read
+            and the real advisor.py logic still runs — only the weather
+            data source changes.
     """
     load_dotenv()
 
     print(WELCOME_MESSAGE)
+    if demo:
+        print("*** DEMO MODE: using sample forecast data, not a live API call. ***\n")
 
-    city = _prompt_for_city()
+    city = _prompt_for_city() if not demo else "Demo City"
     if city is None:
         return  # user quit before even starting
 
@@ -63,9 +73,9 @@ def run() -> None:
         elif _is_help_command(user_input):
             print(WELCOME_MESSAGE)
         elif _is_week_command(user_input):
-            _handle_advice_request(city, days=5)
+            _handle_advice_request(city, days=5, demo=demo)
         elif _is_today_command(user_input):
-            _handle_advice_request(city, days=1)
+            _handle_advice_request(city, days=1, demo=demo)
         else:
             print(
                 "Sorry, I didn't understand that. "
@@ -106,19 +116,25 @@ def _is_today_command(text: str) -> bool:
     return any(word in text for word in ("today", "day look like", "how's today", "now"))
 
 
-def _handle_advice_request(city: str, days: int) -> None:
+def _handle_advice_request(city: str, days: int, demo: bool = False) -> None:
     """Fetch weather + calendar, generate advice, and print it.
 
     Args:
-        city: City name to fetch weather for.
+        city: City name to fetch weather for (ignored in demo mode).
         days: How many days ahead of forecast data to consider when
             filtering advice (1 = today only, 5 = full forecast window).
+        demo: If True, uses hardcoded sample forecast data instead of
+            calling the live OpenWeather API.
     """
-    try:
-        forecast = fetch_forecast(city)
-    except WeatherError as e:
-        print(f"Couldn't get the weather: {e}")
-        return
+    if demo:
+        from sample_data import DEMO_FORECAST
+        forecast = DEMO_FORECAST
+    else:
+        try:
+            forecast = fetch_forecast(city)
+        except WeatherError as e:
+            print(f"Couldn't get the weather: {e}")
+            return
 
     try:
         calendar_result = load_calendar("calendar.json")
