@@ -11,6 +11,12 @@ A CLI-based (REPL) personal assistant that fetches live weather data, reads your
 
 See `specs/PRD.md` for the full product requirements and design rationale, including why advice synthesis is rule-based rather than LLM-powered.
 
+## Demo Video
+
+[Watch the ~1.5-minute walkthrough on Google Drive]  
+https://drive.google.com/file/d/1183bA-l0kNhNh9dnUexRnbe2UEPEd91S/view?usp=sharing
+covers project structure, the test suite, demo mode (no API key needed), and live mode.
+
 > **Grading without an API key?** Run `python main.py --demo` — no OpenWeather API key required. It uses hardcoded sample forecast data instead of a live call, but runs through the exact same `advisor.py` logic, including a scenario that triggers the rain + event + alternate-transport suggestion. See "Demo Mode" below for details.
 
 ## Getting Started
