@@ -273,3 +273,29 @@ class TestRubricCoreScenario:
         message = advice[0].message.lower()
         assert "warmly" in message
         assert "morning commute" in message
+
+    def test_multiple_events_in_same_bucket_all_get_advice(self):
+        """Regression test for a real bug found during manual review:
+        the original _find_overlapping_event() returned only the FIRST
+        matching event for a given date/time-of-day bucket via an early
+        `return`, silently dropping advice for any other event in the
+        same bucket. This test proves two events in the same morning
+        window (a 9am standup and a 10am dentist appointment) both
+        receive advice, not just the first one encountered.
+        """
+        forecast = [
+            make_forecast_entry(
+                date="2026-06-20", hour=9, condition="Rain",
+                description="steady rain", precipitation_chance=0.8,
+            )
+        ]
+        events = [
+            make_event(title="Team standup", date="2026-06-20", hour=9),
+            make_event(title="Dentist appointment", date="2026-06-20", hour=10),
+        ]
+
+        advice = generate_advice(forecast, events)
+
+        assert len(advice) == 2
+        related_events = {a.related_event for a in advice}
+        assert related_events == {"Team standup", "Dentist appointment"}    

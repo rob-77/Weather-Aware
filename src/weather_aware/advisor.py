@@ -94,29 +94,37 @@ def _is_cold(forecast_entry: dict) -> bool:
     return forecast_entry["feels_like_f"] is not None and forecast_entry["feels_like_f"] < COLD_THRESHOLD_F
 
 
-def _find_overlapping_event(
+def _find_overlapping_events(
     forecast_entry: dict, events: list[CalendarEvent]
-) -> CalendarEvent | None:
-    """Find a calendar event whose date and time-of-day bucket match this
-    forecast entry, if any.
+) -> list[CalendarEvent]:
+    """Find ALL calendar events whose date and time-of-day bucket match
+    this forecast entry.
+
+    BUGFIX (manual fix, see README Vibe Report): the original version of
+    this function returned only the first matching event via an early
+    `return`. If two events fell in the same date + time-of-day bucket
+    (e.g. a 9am standup and a 10am dentist appointment, both "morning"),
+    the second event's advice was silently dropped. This version collects
+    ALL matches so advice can be generated for every overlapping event.
 
     Args:
         forecast_entry: A single normalized forecast entry (see weather.py).
         events: List of validated calendar events.
 
     Returns:
-        The first matching CalendarEvent, or None if no event overlaps
-        this date/time-of-day window.
+        A list of all CalendarEvents that fall in this date/time-of-day
+        window. Empty list if none overlap.
     """
     entry_date = forecast_entry["date"]
     entry_bucket = time_of_day_bucket(forecast_entry["hour"])
 
+    matches = []
     for event in events:
         event_date = event.start.strftime("%Y-%m-%d")
         event_bucket = time_of_day_bucket(event.start.hour)
         if event_date == entry_date and event_bucket == entry_bucket:
-            return event
-    return None
+            matches.append(event)
+    return matches
 
 
 def generate_advice(
@@ -131,27 +139,44 @@ def generate_advice(
             calendar_reader.py's load_calendar().
 
     Returns:
-        A list of Advice entries, one per forecast entry that warrants
-        advice (rain, heat, or cold). Forecast entries with nothing
-        noteworthy produce no advice (no spam for a mild, clear afternoon).
+        A list of Advice entries. If multiple events overlap the same
+        forecast window, one Advice entry is produced per event (see
+        BUGFIX note on _find_overlapping_events). If no events overlap
+        but the weather is still noteworthy, one general Advice entry
+        is produced. Forecast entries with nothing noteworthy produce
+        no advice at all.
     """
     advice_list: list[Advice] = []
 
     for entry in forecast:
         bucket = time_of_day_bucket(entry["hour"])
-        overlapping_event = _find_overlapping_event(entry, events)
-        event_title = overlapping_event.title if overlapping_event else None
+        if not (_is_rainy(entry) or _is_hot(entry) or _is_cold(entry)):
+            continue
 
-        if _is_rainy(entry):
-            advice_list.append(
-                _build_rain_advice(entry, bucket, overlapping_event, event_title)
-            )
-        elif _is_hot(entry):
-            advice_list.append(_build_heat_advice(entry, bucket, event_title))
-        elif _is_cold(entry):
-            advice_list.append(_build_cold_advice(entry, bucket, event_title))
+        overlapping_events = _find_overlapping_events(entry, events)
+
+        if overlapping_events:
+            for event in overlapping_events:
+                advice_list.append(_build_advice_for_entry(entry, bucket, event))
+        else:
+            advice_list.append(_build_advice_for_entry(entry, bucket, None))
 
     return advice_list
+
+
+def _build_advice_for_entry(
+    entry: dict, bucket: str, event: CalendarEvent | None
+) -> Advice:
+    """Dispatch to the right advice builder based on which condition
+    triggered (rain takes priority, then heat, then cold).
+    """
+    event_title = event.title if event else None
+    if _is_rainy(entry):
+        return _build_rain_advice(entry, bucket, event, event_title)
+    elif _is_hot(entry):
+        return _build_heat_advice(entry, bucket, event_title)
+    else:
+        return _build_cold_advice(entry, bucket, event_title)
 
 
 def _build_rain_advice(
